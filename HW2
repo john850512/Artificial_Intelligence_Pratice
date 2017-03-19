@@ -1,0 +1,189 @@
+//HW2:基因演算法，找最大值
+//文章網址:https://john850512.wordpress.com/2017/03/19/%E4%BA%BA%E5%B7%A5%E6%99%BA%E6%85%A7%E5%9F%BA%E5%9B%A0%E6%BC%94%E7%AE%97%E6%B3%95-%E6%89%BE%E6%9C%80%E5%A4%A7%E5%80%BC/#more-2162
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <time.h>
+#include <string.h>
+#pragma warning(disable:4996)
+/*
+基本概念:每次從母群中把母體放入交配池做交配和突變，做完再更新母群，這樣的流程為一次演化。
+如何表示基因:http://edisonx.pixnet.net/blog/post/90563824-%5Bga%5D-%E5%9F%BA%E5%9B%A0%E6%BC%94%E7%AE%97%E6%B3%95%E6%A6%82%E5%BF%B5%E7%B4%B0%E8%AA%AA-(i)---%E7%B7%A8%E8%A7%A3%E7%A2%BC
+如何運算:http://edisonx.pixnet.net/blog/post/85835614
+*/
+#define GENE_LENGTH 12 //基因長度
+#define POPULATION_NUMBER 40 //母群數量
+#define ITERATION_NUMBER 100 //迭代次數
+#define CROSSOVER_RATE 0.5 //交配率
+#define MUTATION_RATE 0.1 //突變率
+struct parent //一個母體
+{
+	double dec; //母體的10進位數值
+	double fitness; //母體的適應函數
+	bool gene[GENE_LENGTH];
+};
+void cal_parent_dec(parent &p);
+void cal_parent_fitness(parent &p);
+void copy_parent_from_to(parent &a , parent &b);
+void init();
+void reproduction();
+void crossover();
+void mutation();
+parent population[POPULATION_NUMBER];
+parent pool[POPULATION_NUMBER];
+parent best_gene;
+
+void cal_parent_dec(parent &p)//將基因訊息轉為10進位小數
+{
+	int dec = 0;
+	for(int i = 0 ; i < GENE_LENGTH ; ++i)
+	{
+		if(p.gene[i] == 1) dec +=  (1 << i);
+	}
+	//內插法將基因序列轉化為對應小數
+	p.dec = ( (1-0) / (pow(2.0,GENE_LENGTH)-1) ) * dec; 
+}
+void cal_parent_fitness(parent &p)//計算適應函數
+{
+	double t = p.dec;
+	p.fitness = pow( sin(t*5*3.14159) , 6.0 ) * exp( -3.125 * log(2.0) * pow(t-0.1,2.0) );
+}
+void copy_parent_from_to(parent &a , parent &b)//將母體從a複製到b
+{
+	memcpy(&b,&a,sizeof(parent));
+}
+void init()
+{
+	for(int i = 0 ; i < POPULATION_NUMBER ; ++i)
+	{
+		for(int j = 0 ; j < GENE_LENGTH ; ++j)
+		{
+			population[i].gene[j] = rand() % 2;
+		}		
+		cal_parent_dec(population[i]);
+		cal_parent_fitness(population[i]);
+		//printf("%f %f\n",population[i].dec,population[i].fitness);
+		//更新best_gene
+		if(i == 0)copy_parent_from_to(population[0],best_gene);
+		else if(population[i].fitness > best_gene.fitness) copy_parent_from_to(population[i],best_gene);
+
+	}
+}
+void reproduction()//輪盤式選擇(分配式)
+{
+	int remainder = POPULATION_NUMBER;
+	int has_copy = 0;
+	int p1 = 0,p2 = 0;
+	double fitness_sum = 0;
+	//計算評估函數總和
+	for(int i = 0 ; i < POPULATION_NUMBER ; ++i)
+	{
+		fitness_sum += population[i].fitness;
+	}
+	//輪盤式選擇(分配式)
+	for(int i = 0 ; i < POPULATION_NUMBER && remainder != 0 ; ++i)
+	{
+		int num = (int)( ( population[i].fitness / fitness_sum * POPULATION_NUMBER) + 0.5 );
+
+		if(num > remainder) num = remainder;
+		//根據比例放對應的數量到pool中
+		for(int j = 0 ; j < num ; ++j)
+		{
+			copy_parent_from_to(population[j],pool[has_copy++]);
+		}
+		remainder -= num;
+	}
+	while(has_copy < POPULATION_NUMBER)
+	{
+		p1 = rand() % POPULATION_NUMBER;
+		do{p2 = rand() % POPULATION_NUMBER;}while(p1 == p2);//確保兩基因不會相同
+		//把比較好的丟到pool
+		if(population[p1].fitness > population[p2].fitness)copy_parent_from_to(population[p1],pool[has_copy++]);
+		else
+			copy_parent_from_to(population[p2],pool[has_copy++]);
+	}
+}
+void crossover()
+{
+	int has_finish = 0;
+	int p1 = 0,p2 = 0;
+	int pos = 0;
+	double if_crossover = 0;
+	while(has_finish < POPULATION_NUMBER)
+	{
+		p1 = rand() % POPULATION_NUMBER;
+		do{p2 = rand() % POPULATION_NUMBER;}while(p1 == p2);
+		if_crossover = (double)rand() / (double)RAND_MAX;
+		if(if_crossover > CROSSOVER_RATE)
+		{
+			//交配
+			//由機率選擇單點交配位置
+			do{pos = rand() % GENE_LENGTH;}while(pos == 0);
+			//僅單點交配基因序列，其他基因資訊仍然是為交配前的，會在mutation階段做更新
+			for(int i = 0 ; i < pos ; ++i)
+			{
+				population[has_finish].gene[i] = pool[p1].gene[i];
+				population[has_finish+1].gene[i] = pool[p2].gene[i];
+			}
+			for(int i = pos ; i < GENE_LENGTH ; ++i)
+			{
+				population[has_finish].gene[i] = pool[p2].gene[i];
+				population[has_finish+1].gene[i] = pool[p1].gene[i];
+			}
+			has_finish+=2;
+		}
+		else
+		{
+			//不交配，原本兩個放回母群
+			copy_parent_from_to(pool[p1],population[has_finish++]);
+			copy_parent_from_to(pool[p2],population[has_finish++]);
+		}
+	}
+}
+void mutation()
+{
+	//針對母群所有基因隨機進行突變，並更新每個基因的適應函數
+	double if_mutation = 0;
+	int pos = 0;
+	for(int i = 0 ; i < POPULATION_NUMBER ; ++i)
+	{
+		if_mutation = (double)rand() / (double)RAND_MAX;
+		if(if_mutation > MUTATION_RATE)
+		{
+			//單點突變
+			pos = rand() % GENE_LENGTH;
+			population[i].gene[pos] ^= 1 ; 
+		}
+		//更新適合函數
+		cal_parent_dec(population[i]);
+		cal_parent_fitness(population[i]);
+		//更新best_gene
+		if(population[i].fitness > best_gene.fitness)
+		{
+			copy_parent_from_to(population[i],best_gene);
+		}
+	}
+}
+int main()
+{
+	srand(time(NULL));
+	init();
+	for(int i = 0 ; i < ITERATION_NUMBER ; ++i)
+	{
+		reproduction();
+		crossover();
+		mutation();
+	}
+	for(int i = 0 ; i < POPULATION_NUMBER ; ++i)
+	{
+		printf("( %5.2f,%5.2f ) ",population[i].dec,population[i].fitness);
+		if(i % 4 == 3)printf("\n");
+	}
+
+	printf("\n\nmax value:\n");
+	printf("( %5.2f,%5.2f ) ",best_gene.dec,best_gene.fitness);
+
+	system("pause");
+	return 0;
+}
