@@ -1,0 +1,46 @@
+//HW1:類神經網路練習(權重學習)
+//文章網址:https://john850512.wordpress.com/2017/03/08/%EF%BC%BB%E4%BA%BA%E5%B7%A5%E6%99%BA%E6%85%A7%EF%BC%BD%E9%A1%9E%E7%A5%9E%E7%B6%93%E7%B6%B2%E8%B7%AF%EF%BC%8D%E5%AD%B8%E7%BF%92%E6%AC%8A%E9%87%8D/#more-2088
+#include <stdio.h>
+#include <stdlib.h>
+#pragma warning(disable:4996)
+
+struct cof //方程式係數
+{
+    int x;
+    int y;
+    int z;
+    int c;
+};
+ 
+int main()
+{
+    //假設有一線性方程式:ax+by+cz-20 = 0，利用學習權重找出a b c
+    int test_data[][4] = //測試點
+    {
+        {1,0,0,-1},
+        {7,7,7,1},
+        {0,0,0,-1},
+        {3,1,1,1},
+        {-1,-1,-1,-1},
+        {4,0,0,1}
+    };
+    cof c = {1,0,0,0}; //假設權重先等於第一筆資料
+    for(int i = 0 ; i < 6 ; ++i)
+    {
+        if( (c.x * test_data[i][0] + c.y * test_data[i][1] + c.z * test_data[i][2] - 20) * test_data[i][3] >= 0)//如果點在線的右邊(>0) * 預設結果在右邊(<0) = 結果相符(>=0)
+        {
+            //權重滿足此點，不用更新
+        }
+        else //如果點在線的右邊(>0) * 預設結果在左邊(<0) = 結果不符(<0)
+        {
+            c.x += test_data[i][0]* test_data[i][3];
+            c.y += test_data[i][1]* test_data[i][3];
+            c.z += test_data[i][2]* test_data[i][3];        
+            if(i == 5)i = 0;
+        }
+        printf("%d %d %d\n",c.x,c.y,c.z);
+    }
+ 
+    system("pause");
+    return 0;
+}
